@@ -20,7 +20,6 @@
 import base64
 import logging
 import optparse
-import os
 import sys
 import socket
 import time
@@ -29,15 +28,16 @@ import urllib2
 try:
     # this should be available in any python 2.6 or newer
     import json
-except:
-  try:
-      # simplejson is a good replacement on 2.5 installs
-      import simplejson as json
-  except:
-      print "FATAL ERROR: can't find any json library for python"
-      print "Please install simplejson, json, or upgrade to python 2.6+"
-      sys.exit(1)
-#end json import
+    json = json
+except ImportError:
+    try:
+        # simplejson is a good replacement on 2.5 installs
+        import simplejson as json
+    except:
+        print "FATAL ERROR: can't find any json library for python"
+        print "Please install simplejson, json, or upgrade to python 2.6+"
+        sys.exit(1)
+
 
 class JenkinsServer(object):
     def __init__(self, base_url, user, password):
@@ -68,13 +68,14 @@ class JenkinsServer(object):
             f.close()
             data = json.loads(response)
         except Exception, e:
-            logging.warn("Unable to get jenkins response for url %s: %s" %(url, e))
+            logging.warn("Unable to get jenkins response for url %s: %s" % (url, e))
             return {}
 
         return data
 
     def get_data(self, url):
         return self.get_raw_data("%s/api/json" % url)
+
 
 class GraphiteServer(object):
     def __init__(self, server, port, prefix):
@@ -85,7 +86,7 @@ class GraphiteServer(object):
         self.data = {}
 
     def add_data(self, key, value):
-        self.data["%s.%s" %( self.prefix, key)] = value
+        self.data["%s.%s" % (self.prefix, key)] = value
 
     def _data_as_msg(self):
         msg = ""
@@ -106,6 +107,7 @@ class GraphiteServer(object):
             return False
 
         return True
+
 
 def parse_args():
     parser = optparse.OptionParser()
@@ -135,6 +137,7 @@ def parse_args():
 
     return opts
 
+
 def main():
     opts = parse_args()
     jenkins = JenkinsServer(opts.jenkins_url, opts.jenkins_user,
@@ -144,8 +147,8 @@ def main():
 
     executor_info = jenkins.get_data("computer")
     queue_info = jenkins.get_data("queue")
-    build_info_min = jenkins.get_raw_data("view/All/timeline/data?min=%d&max=%d" % ((time.time() - 60)*1000, time.time()*1000))
-    build_info_hour = jenkins.get_raw_data("view/All/timeline/data?min=%d&max=%d" % ((time.time() - 3600)*1000, time.time()*1000))
+    build_info_min = jenkins.get_raw_data("view/All/timeline/data?min=%d&max=%d" % ((time.time() - 60) * 1000, time.time() * 1000))
+    build_info_hour = jenkins.get_raw_data("view/All/timeline/data?min=%d&max=%d" % ((time.time() - 3600) * 1000, time.time() * 1000))
 
     graphite.add_data("queue.size", len(queue_info.get("items", [])))
 
@@ -158,7 +161,7 @@ def main():
                       executor_info.get("totalExecutors", 0) -
                       executor_info.get("busyExecutors", 0))
 
-    nodes_total = executor_info.get("computer", []);
+    nodes_total = executor_info.get("computer", [])
     nodes_offline = [j for j in nodes_total if j.get("offline")]
     graphite.add_data("nodes.total", len(nodes_total))
     graphite.add_data("nodes.offline", len(nodes_offline))
